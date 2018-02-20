@@ -98,11 +98,22 @@ type (
 		// Block height that the file contract began on.
 		StartHeight types.BlockHeight `json:"startheight"`
 		// Amount of contract funds that have been spent on storage.
-		StorageSpending types.Currency `json:"StorageSpending"`
+		StorageSpending types.Currency `json:"storagespending"`
+		// DEPRECATED: This is the exact same value as StorageSpending, but it has
+		// incorrect capitalization. This was fixed in 1.3.2, but this field is kept
+		// to preserve backwards compatibility on clients who depend on the
+		// incorrect capitalization. This field will be removed in the future, so
+		// clients should switch to the StorageSpending field (above) with the
+		// correct lowercase name.
+		StorageSpendingDeprecated types.Currency `json:"StorageSpending"`
 		// Total cost to the wallet of forming the file contract.
 		TotalCost types.Currency `json:"totalcost"`
 		// Amount of contract funds that have been spent on uploads.
 		UploadSpending types.Currency `json:"uploadspending"`
+		// Signals if contract is good for uploading data
+		GoodForUpload bool `json:"goodforupload"`
+		// Signals if contract is good for a renewal
+		GoodForRenew bool `json:"goodforrenew"`
 	}
 
 	// RenterContracts contains the renter's contracts.
@@ -110,7 +121,7 @@ type (
 		Contracts []RenterContract `json:"contracts"`
 	}
 
-	// DownloadQueue contains the renter's download queue.
+	// RenterDownloadQueue contains the renter's download queue.
 	RenterDownloadQueue struct {
 		Downloads []DownloadInfo `json:"downloads"`
 	}
@@ -239,20 +250,31 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			netAddress = hdbe.NetAddress
 		}
 
+		// Fetch utilities for contract
+		var goodForUpload bool
+		var goodForRenew bool
+		if utility, ok := api.renter.ContractUtility(c.ID); ok {
+			goodForUpload = utility.GoodForUpload
+			goodForRenew = utility.GoodForRenew
+		}
+
 		contracts = append(contracts, RenterContract{
-			DownloadSpending: c.DownloadSpending,
-			EndHeight:        c.EndHeight,
-			Fees:             c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
-			HostPublicKey:    c.HostPublicKey,
-			ID:               c.ID,
-			LastTransaction:  c.Transaction,
-			NetAddress:       netAddress,
-			RenterFunds:      c.RenterFunds,
-			Size:             size,
-			StartHeight:      c.StartHeight,
-			StorageSpending:  c.StorageSpending,
-			TotalCost:        c.TotalCost,
-			UploadSpending:   c.UploadSpending,
+			DownloadSpending:          c.DownloadSpending,
+			EndHeight:                 c.EndHeight,
+			Fees:                      c.TxnFee.Add(c.SiafundFee).Add(c.ContractFee),
+			GoodForUpload:             goodForUpload,
+			GoodForRenew:              goodForRenew,
+			HostPublicKey:             c.HostPublicKey,
+			ID:                        c.ID,
+			LastTransaction:           c.Transaction,
+			NetAddress:                netAddress,
+			RenterFunds:               c.RenterFunds,
+			Size:                      size,
+			StartHeight:               c.StartHeight,
+			StorageSpending:           c.StorageSpending,
+			StorageSpendingDeprecated: c.StorageSpending,
+			TotalCost:                 c.TotalCost,
+			UploadSpending:            c.UploadSpending,
 		})
 	}
 	WriteJSON(w, RenterContracts{
